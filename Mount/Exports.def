@@ -1,0 +1,7 @@
+LIBRARY      CciMount
+EXPORTS
+	CciGetVersion	@1
+	CciMount		@2
+	CciUnmount		@3
+	CciIsMounted	@4
+	CciMountWithOverlay	@5

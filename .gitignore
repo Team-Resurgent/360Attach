@@ -1,0 +1,19 @@
+bin/
+*/Debug/
+*/Release/
+ipch/
+*.sdf
+*.suo
+*.user
+*.opensdf
+
+# disc images and on-console logs
+*.cci
+*.iso
+*.log
+
+# staged console folders
+deploy/
+
+# generated from bin/Release/mount.xex by the Launcher prebuild step
+Launcher/CciMountImage.c

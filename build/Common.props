@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared settings for both XEX projects: include paths for the XDK declarations, libCCI and
+     LZ4, and import libraries for the kernel/XAM exports the XDK does not ship,
+     generated from the .def files in common\xdk before each build. -->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ThirdPartyDir>$(SolutionDir)third_party\</ThirdPartyDir>
+    <XdkDir>$(SolutionDir)common\xdk\</XdkDir>
+    <LibCciDir>$(ThirdPartyDir)libCCI\</LibCciDir>
+    <Lz4Dir>$(LibCciDir)third_party\lz4\lib\</Lz4Dir>
+    <XdkLibOutDir>$(IntDir)xdk\</XdkLibOutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)common;$(XdkDir);$(LibCciDir)include;$(Lz4Dir);$(SolutionDir)build\xdk-shims;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- __SIZE_TYPE__: some XDK installs have a vectorintrinsics.h patched for clang that uses it -->
+      <PreprocessorDefinitions>_XBOX;LZ4_FORCE_SW_BITCOUNT;__SIZE_TYPE__=unsigned long;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+      <ExceptionHandling>false</ExceptionHandling>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(XdkLibOutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernelext.lib;xamext.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <PreBuildEvent>
+      <Command>if not exist "$(XdkLibOutDir)" mkdir "$(XdkLibOutDir)"
+"$(XEDK)\bin\win32\lib.exe" /nologo /def:"$(XdkDir)kernelext21256.0.def" /MACHINE:PPCBE /OUT:"$(XdkLibOutDir)kernelext.lib"
+"$(XEDK)\bin\win32\lib.exe" /nologo /def:"$(XdkDir)xamext21256.0.def" /MACHINE:PPCBE /OUT:"$(XdkLibOutDir)xamext.lib"</Command>
+      <Message>Generating XDK import libraries</Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+</Project>

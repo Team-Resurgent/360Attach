@@ -1,0 +1,26 @@
+
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Mount", "Mount\Mount.vcxproj", "{9D1C5203-8039-4BE1-BF1C-8E34FDB40686}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Launcher", "Launcher\Launcher.vcxproj", "{7506D22C-459B-4445-975E-73E34D67587D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Xbox 360 = Debug|Xbox 360
+		Release|Xbox 360 = Release|Xbox 360
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9D1C5203-8039-4BE1-BF1C-8E34FDB40686}.Debug|Xbox 360.ActiveCfg = Debug|Xbox 360
+		{9D1C5203-8039-4BE1-BF1C-8E34FDB40686}.Debug|Xbox 360.Build.0 = Debug|Xbox 360
+		{9D1C5203-8039-4BE1-BF1C-8E34FDB40686}.Release|Xbox 360.ActiveCfg = Release|Xbox 360
+		{9D1C5203-8039-4BE1-BF1C-8E34FDB40686}.Release|Xbox 360.Build.0 = Release|Xbox 360
+		{7506D22C-459B-4445-975E-73E34D67587D}.Debug|Xbox 360.ActiveCfg = Debug|Xbox 360
+		{7506D22C-459B-4445-975E-73E34D67587D}.Debug|Xbox 360.Build.0 = Debug|Xbox 360
+		{7506D22C-459B-4445-975E-73E34D67587D}.Release|Xbox 360.ActiveCfg = Release|Xbox 360
+		{7506D22C-459B-4445-975E-73E34D67587D}.Release|Xbox 360.Build.0 = Release|Xbox 360
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
