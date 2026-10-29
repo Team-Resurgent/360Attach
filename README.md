@@ -8,10 +8,10 @@ for RGH/JTAG consoles. Built with Visual Studio 2010 and the Xbox 360 XDK (21256
 Put the two built files in the folder that holds the image:
 
 ```
-Hdd:\Games\Terraria\
+Hdd:\Games\MyGame\
     default.xex                       <- bin\Release\default.xex
     mount.xex                      <- bin\Release\mount.xex
-    Terraria (USA) (En,Fr,De,Es,It).cci
+    game.cci                       <- or game.iso; any name works
 ```
 
 Launch `default.xex` from your dashboard. It mounts the first `.cci` in its

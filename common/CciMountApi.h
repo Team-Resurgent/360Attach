@@ -16,7 +16,7 @@
 
 // A part is a .cci, or a raw .iso split by sector (name.1.iso, name.2.iso, ...).
 // Paths are full kernel object paths, e.g.
-// "\Device\Harddisk0\Partition1\Games\Terraria\Terraria.cci", one per part in
+// "\Device\Harddisk0\Partition1\Games\MyGame\game.cci", one per part in
 // part order. The files are opened from a system thread, so the handles stay
 // valid after the calling title exits.
 typedef DWORD	 (*PFN_CCIGETVERSION)( VOID );
