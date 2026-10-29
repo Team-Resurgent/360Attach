@@ -12,7 +12,6 @@
 
 #define LOG_PATH		"game:\\Launcher.log"
 #define DISC_EXEC		"\\Device\\Cdrom0\\default.xex"
-#define DEVKIT_XEX_NAME	"default.devkit.xex"
 #define DISC_ROOT		"\\Device\\Cdrom0"
 
 static FILE * g_Log = NULL;
@@ -434,27 +433,6 @@ static HANDLE LoadCciMount( const CHAR * titleDir )
 	return req.Module;
 }
 
-// Devkit check through xbdm, resolved at runtime: retail and RGH consoles
-// usually have no xbdm, and a static import would stop this title loading.
-#define XBDM_ORD_DMGETCONSOLETYPE	140
-#define DMCT_DEVELOPMENT_KIT_TYPE	0
-typedef HRESULT (*PFN_DMGETCONSOLETYPE)( DWORD * consoleType );
-
-static BOOL IsDevkit( VOID )
-{
-	HANDLE xbdm = NULL;
-	if( XexGetModuleHandle( "xbdm.xex", &xbdm ) != 0 || xbdm == NULL ) return FALSE;
-
-	PFN_DMGETCONSOLETYPE getConsoleType = NULL;
-	if( XexGetProcedureAddress( xbdm, XBDM_ORD_DMGETCONSOLETYPE, &getConsoleType ) != 0 || getConsoleType == NULL )
-		return FALSE;
-
-	DWORD type = 0xFFFFFFFF;
-	HRESULT hr = getConsoleType( &type );
-	Log( "xbdm console type %u (hr 0x%08X)", type, hr );
-	return SUCCEEDED(hr) && type == DMCT_DEVELOPMENT_KIT_TYPE;
-}
-
 template<typename T> static BOOL Resolve( HANDLE module, DWORD ordinal, T * fn )
 {
 	*fn = NULL;
@@ -499,21 +477,7 @@ static BOOL MountAndLaunch( VOID )
 		pathPtrs[i] = paths[i];
 	}
 
-	// On a devkit, a default.devkit.xex next to the image (the disc's
-	// default.xex re-signed with XexTool -m d) is swapped in for the retail one.
-	NTSTATUS status;
-	PFN_CCIMOUNTOVERLAY mountOverlay;
-	if( FileExists( DEVKIT_XEX_NAME ) && IsDevkit() && Resolve( module, CCIMOUNT_ORD_MOUNTOVERLAY, &mountOverlay ) )
-	{
-		CHAR overlayPath[MAX_PATH];
-		sprintf_s( overlayPath, sizeof(overlayPath), "%s\\%s", titleDir, DEVKIT_XEX_NAME );
-		Log( "devkit: overlaying %s", overlayPath );
-		status = mountOverlay( pathPtrs, set.Count, overlayPath );
-	}
-	else
-	{
-		status = mount( pathPtrs, set.Count );
-	}
+	NTSTATUS status = mount( pathPtrs, set.Count );
 	if( !NT_SUCCESS(status) )
 	{
 		Log( "mount failed 0x%08X", status );

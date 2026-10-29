@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "CciIo.h"
 #include "CciStream.h"
-#include "FileIo.h"
+#include "XexDevkit.h"
 #include "VTray.h"
 
 #include <cci/cci.h>
@@ -16,7 +16,6 @@
 typedef struct _MOUNT_REQUEST {
 	const CHAR * const * PartPaths;
 	DWORD PartCount;
-	const CHAR * OverlayPath;		// replacement for the disc's default.xex, or NULL
 } MOUNT_REQUEST;
 
 // XDVDFS volume descriptor fields and directory entry layout.
@@ -26,7 +25,7 @@ typedef struct _MOUNT_REQUEST {
 #define XDVDFS_MAX_ROOT_SIZE		(64 * 1024)
 #define XDVDFS_MAX_TREE_DEPTH		64
 
-#define OVERLAY_TARGET_NAME			"default.xex"
+#define DISC_XEX_NAME				"default.xex"
 
 // Where the game partition can start inside an image, and where the DMI/SS
 // sector pair sits for the full-disc layouts.
@@ -56,14 +55,6 @@ static volatile BOOL g_Mounted = FALSE;
 static DWORD g_BaseSector = 0;
 static DWORD g_SectorCount = 0;
 static CCI_MEDIA_INFO g_MediaInfo;
-
-// Devkit overlay: a file whose bytes replace those of one file on the disc,
-// so a retail XEX can be swapped for a devkit-signed one of the same size.
-static struct {
-	HANDLE File;
-	DWORD StartSector;		// partition-relative, as XDVDFS records it
-	DWORD Size;
-} g_Overlay;
 
 static BYTE g_RootDir[XDVDFS_MAX_ROOT_SIZE];
 
@@ -168,58 +159,24 @@ static BOOL FindRootFile( const CHAR * name, DWORD * startSector, DWORD * size )
 	return FALSE;
 }
 
-static VOID CloseOverlay( VOID )
+// On a devkit, resign the disc's default.xex into a header-sector buffer.
+// Retail and RGH consoles mount the image unchanged.
+static NTSTATUS PrepareDevkitXex( VOID )
 {
-	if( g_Overlay.File != NULL ) NtClose( g_Overlay.File );
-	memset( &g_Overlay, 0, sizeof(g_Overlay) );
-}
+	if( !XexDevkitIsConsoleDevkit() ) return STATUS_SUCCESS;
 
-// The overlay only applies when it is exactly the size of the file it
-// replaces, so the volume's directory stays valid as-is.
-static VOID OpenOverlay( const CHAR * path )
-{
 	DWORD start, size;
-	if( !FindRootFile( OVERLAY_TARGET_NAME, &start, &size ) )
+	if( !FindRootFile( DISC_XEX_NAME, &start, &size ) )
 	{
-		LOG( "overlay: %s not found in the root directory", OVERLAY_TARGET_NAME );
-		return;
+		LOG( "devkit: %s not found in the root directory", DISC_XEX_NAME );
+		return STATUS_OBJECT_NAME_NOT_FOUND;
 	}
-
-	HANDLE file;
-	ULONGLONG fileSize;
-	NTSTATUS status = FileOpenRead( path, &file, &fileSize );
-	if( !NT_SUCCESS(status) )
+	if( start >= g_SectorCount )
 	{
-		LOG( "overlay: open %s failed 0x%08X", path, status );
-		return;
+		LOG( "devkit: %s sector 0x%X is past the end of the partition", DISC_XEX_NAME, start );
+		return STATUS_FILE_CORRUPT_ERROR;
 	}
-	if( fileSize != size )
-	{
-		LOG( "overlay: %s is 0x%I64X bytes but %s is 0x%X; not applied", path, fileSize, OVERLAY_TARGET_NAME, size );
-		NtClose( file );
-		return;
-	}
-
-	g_Overlay.File = file;
-	g_Overlay.StartSector = start;
-	g_Overlay.Size = size;
-	LOG( "overlay: %s replaces %s (sector 0x%X, 0x%X bytes)", path, OVERLAY_TARGET_NAME, start, size );
-}
-
-// Replaces the overlaid file's bytes inside a read of [sector, sector + length).
-static NTSTATUS ApplyOverlay( DWORD sector, DWORD length, BYTE * dest )
-{
-	if( g_Overlay.File == NULL ) return STATUS_SUCCESS;
-
-	ULONGLONG readStart = (ULONGLONG)sector * CCI_SECTOR_SIZE;
-	ULONGLONG readEnd = readStart + length;
-	ULONGLONG fileStart = (ULONGLONG)g_Overlay.StartSector * CCI_SECTOR_SIZE;
-	ULONGLONG fileEnd = fileStart + g_Overlay.Size;
-	ULONGLONG lo = readStart > fileStart ? readStart : fileStart;
-	ULONGLONG hi = readEnd < fileEnd ? readEnd : fileEnd;
-	if( lo >= hi ) return STATUS_SUCCESS;
-
-	return FileReadAt( g_Overlay.File, lo - fileStart, dest + (DWORD)(lo - readStart), (DWORD)(hi - lo) );
+	return XexDevkitPatch( g_BaseSector + start, start, size );
 }
 
 static VOID SetMounted( BOOL mounted )
@@ -236,19 +193,20 @@ static NTSTATUS DoMount( const MOUNT_REQUEST * req )
 	SetMounted( FALSE );
 	memset( &g_MediaInfo, 0, sizeof(g_MediaInfo) );
 
-	CloseOverlay();
+	XexDevkitClear();
 
 	NTSTATUS status = CciStreamOpen( req->PartPaths, req->PartCount );
 	if( NT_SUCCESS(status) ) status = DetectLayout();
+	if( NT_SUCCESS(status) ) status = PrepareDevkitXex();
 	if( NT_SUCCESS(status) )
 	{
-		if( req->OverlayPath != NULL ) OpenOverlay( req->OverlayPath );
 		SetMounted( TRUE );
 		LOG( "mounted: %u sectors from partition sector 0x%X", g_SectorCount, g_BaseSector );
 	}
 	else
 	{
 		LOG( "mount failed 0x%08X (check the lines above for the step that failed)", status );
+		XexDevkitClear();
 		CciStreamClose();
 	}
 
@@ -260,7 +218,7 @@ static NTSTATUS DoUnmount( VOID )
 {
 	SetMounted( FALSE );
 	memset( &g_MediaInfo, 0, sizeof(g_MediaInfo) );
-	CloseOverlay();
+	XexDevkitClear();
 	CciStreamClose();
 	VTrayCycle();
 	return STATUS_SUCCESS;
@@ -290,7 +248,7 @@ static VOID DoRead( PIRP irp )
 				status = CciStreamReadSectors( g_BaseSector + sector + whole, 1, g_Scratch );
 				if( NT_SUCCESS(status) ) memcpy( dest + whole * CCI_SECTOR_SIZE, g_Scratch, tail );
 			}
-			if( NT_SUCCESS(status) ) status = ApplyOverlay( sector, length, dest );
+			if( NT_SUCCESS(status) ) XexDevkitSplice( sector, length, dest );
 			if( !NT_SUCCESS(status) ) status = STATUS_IO_DEVICE_ERROR;
 		}
 	}
@@ -371,8 +329,9 @@ VOID CciIoStartup( VOID )
 	KeInitializeEvent( &g_Worker.Wake, EventSynchronizationObject, FALSE );
 
 	// System thread on the last hardware thread, which titles rarely saturate.
+	// 32 KB leaves room for the devkit RSA resign, which runs on this thread.
 	DWORD flags = EX_CREATE_FLAG_SYSTEM | EX_CREATE_FLAG_CORE5 | EX_CREATE_FLAG_PRIORITY1;
-	if( NT_SUCCESS(ExCreateThread( &g_Worker.Thread, 0x4000, NULL, NULL, (LPTHREAD_START_ROUTINE)WorkerMain, NULL, flags )) )
+	if( NT_SUCCESS(ExCreateThread( &g_Worker.Thread, 0x8000, NULL, NULL, (LPTHREAD_START_ROUTINE)WorkerMain, NULL, flags )) )
 		SetThreadPriority( g_Worker.Thread, THREAD_PRIORITY_TIME_CRITICAL );
 	else
 		LOG( "worker thread creation failed" );
@@ -380,9 +339,9 @@ VOID CciIoStartup( VOID )
 	VTrayStartup();
 }
 
-NTSTATUS CciIoMount( const CHAR * const * partPaths, DWORD partCount, const CHAR * overlayPath )
+NTSTATUS CciIoMount( const CHAR * const * partPaths, DWORD partCount )
 {
-	MOUNT_REQUEST req = { partPaths, partCount, overlayPath };
+	MOUNT_REQUEST req = { partPaths, partCount };
 	return RunOnWorker( CCIIO_REQ_MOUNT, &req );
 }
 

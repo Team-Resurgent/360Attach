@@ -13,9 +13,7 @@ typedef struct _CCI_MEDIA_INFO {
 } CCI_MEDIA_INFO;
 
 VOID	 CciIoStartup( VOID );
-// overlayPath, when not NULL, names a file that replaces the disc's
-// default.xex byte for byte (see CciMountWithOverlay).
-NTSTATUS CciIoMount( const CHAR * const * partPaths, DWORD partCount, const CHAR * overlayPath );
+NTSTATUS CciIoMount( const CHAR * const * partPaths, DWORD partCount );
 NTSTATUS CciIoUnmount( VOID );
 
 BOOL	 CciIoIsMounted( VOID );

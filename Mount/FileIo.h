@@ -1,5 +1,5 @@
-// Kernel file helpers for the driver's files (the image parts and the devkit
-// overlay). Call from the I/O worker so the handles belong to the system process.
+// Kernel file helpers for the image parts. Call from the I/O worker so the
+// handles belong to the system process.
 #ifndef __FILEIO_H
 #define __FILEIO_H
 

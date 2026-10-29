@@ -10,7 +10,7 @@ DWORD CciGetVersion( VOID )
 	return CCIMOUNT_VERSION;
 }
 
-NTSTATUS CciMountWithOverlay( const CHAR * const * partPaths, DWORD partCount, const CHAR * overlayPath )
+NTSTATUS CciMount( const CHAR * const * partPaths, DWORD partCount )
 {
 	if( partPaths == NULL || partCount == 0 || partCount > CCIMOUNT_MAX_PARTS )
 		return STATUS_INVALID_PARAMETER;
@@ -26,17 +26,12 @@ NTSTATUS CciMountWithOverlay( const CHAR * const * partPaths, DWORD partCount, c
 	if( NT_SUCCESS(status) )
 	{
 		LOG( "mounting %s (%u part%s)", partPaths[0], partCount, partCount == 1 ? "" : "s" );
-		status = CciIoMount( partPaths, partCount, overlayPath );
+		status = CciIoMount( partPaths, partCount );
 	}
 	RtlLeaveCriticalSection( &g_MountLock );
 
 	LOG( "mount returns 0x%08X", status );
 	return status;
-}
-
-NTSTATUS CciMount( const CHAR * const * partPaths, DWORD partCount )
-{
-	return CciMountWithOverlay( partPaths, partCount, NULL );
 }
 
 NTSTATUS CciUnmount( VOID )

@@ -16,6 +16,9 @@
 #ifndef STATUS_FILE_CORRUPT_ERROR
 #define STATUS_FILE_CORRUPT_ERROR	((NTSTATUS)0xC0000102L)
 #endif
+#ifndef STATUS_OBJECT_NAME_NOT_FOUND
+#define STATUS_OBJECT_NAME_NOT_FOUND	((NTSTATUS)0xC0000034L)
+#endif
 
 // Doubly linked list helpers (the NT inline versions are not in the XDK headers).
 static __forceinline VOID InitializeListHead( PLIST_ENTRY head )

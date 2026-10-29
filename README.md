@@ -1,7 +1,9 @@
 # 360Attach
 
-Mounts a CCI disc image as the Xbox 360's DVD drive and launches the game on it,
-for RGH/JTAG consoles. Built with Visual Studio 2010 and the Xbox 360 XDK (21256).
+Mounts a CCI disc image as the Xbox 360's DVD drive and launches the game on it.
+Built with Visual Studio 2010 and the Xbox 360 XDK (21256). Retail and RGH
+consoles load the disc as it is. On a devkit, the disc's `default.xex` is
+resigned in memory so the kit accepts it.
 
 ## Using it
 
@@ -37,7 +39,15 @@ values.
   - the DVD/SATA IOCTLs the kernel and XAM send while probing a disc are
     answered from the mounted image (`DvdHook.cpp`);
   - a fake tray open/close is broadcast to SMC listeners so the system drops
-    the previous disc and probes the new one (`VTray.cpp`).
+    the previous disc and probes the new one (`VTray.cpp`);
+  - on a devkit (`XeKeysGetConsoleType`), the root `default.xex` is resigned
+    in memory before the game launches (`XexDevkit.cpp`). The image key is
+    rewrapped and the header is signed with the debug key, the same transform
+    as XexTool `-m d`. Only those header sectors are substituted when the
+    loader reads the file; the executable stays the same size, and the rest of
+    it is still read from the image. A manufacturing executable, or one that
+    is already debug-signed, is left unchanged. If the resign fails, the mount
+    fails instead of launching a retail-signed executable.
   With nothing mounted, all requests pass through to the real drive driver.
 
 The exports are listed in `common/CciMountApi.h`. `mount.xex` stays loaded
