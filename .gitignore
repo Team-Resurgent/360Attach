@@ -17,3 +17,7 @@ deploy/
 
 # generated from bin/Release/mount.xex by the Launcher prebuild step
 Launcher/CciMountImage.c
+
+# build intermediates in any project folder
+Release/
+Debug/
