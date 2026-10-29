@@ -228,8 +228,11 @@ static VOID SetMounted( BOOL mounted )
 	__lwsync();
 }
 
+static DWORD g_ReadErrors = 0;
+
 static NTSTATUS DoMount( const MOUNT_REQUEST * req )
 {
+	g_ReadErrors = 0;
 	SetMounted( FALSE );
 	memset( &g_MediaInfo, 0, sizeof(g_MediaInfo) );
 
@@ -241,9 +244,11 @@ static NTSTATUS DoMount( const MOUNT_REQUEST * req )
 	{
 		if( req->OverlayPath != NULL ) OpenOverlay( req->OverlayPath );
 		SetMounted( TRUE );
+		LOG( "mounted: %u sectors from partition sector 0x%X", g_SectorCount, g_BaseSector );
 	}
 	else
 	{
+		LOG( "mount failed 0x%08X (check the lines above for the step that failed)", status );
 		CciStreamClose();
 	}
 
@@ -290,6 +295,8 @@ static VOID DoRead( PIRP irp )
 		}
 	}
 
+	if( !NT_SUCCESS(status) && g_ReadErrors++ < 16 )
+		LOG( "read failed: sector 0x%X, %u bytes, status 0x%08X", sector, length, status );
 	irp->IoStatus.Information = NT_SUCCESS(status) ? length : 0;
 	irp->IoStatus.st.Status = status;
 	IoCompleteRequest( irp, IO_CD_ROM_INCREMENT );

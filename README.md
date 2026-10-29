@@ -17,7 +17,7 @@ Hdd:\Games\MyGame\
 Launch `default.xex` from your dashboard. It mounts the first `.cci` in its
 folder, then starts `\Device\Cdrom0\default.xex`. A split image
 (`name.1.cci`, `name.2.cci`, ...) is picked up as one disc. Progress and errors
-go to `CciAttach.log` in the same folder and to the debug output.
+go to `Launcher.log` in the same folder and to the debug output.
 
 Both trimmed images (game partition only) and full XGD2/XGD3 dumps work; for a
 full dump the security sectors are read so XGD2 drive-info queries get real
@@ -69,3 +69,16 @@ Output goes to `bin\<Configuration>\`.
 
 Builds cleanly; not yet tested on hardware. Xenia cannot run it: its kernel
 does not dispatch I/O to driver objects that the guest replaces.
+
+## Reporting a problem
+
+If the disc doesn't load, send:
+
+1. `Launcher.log` from the game's folder. It records every step: the image it
+   found, the mount result, and the status codes of any failed read or load.
+2. The console's error message (for example "Unrecognized Disc"), or a photo of it.
+3. If you can run the kit's debug output, the `[Launcher]` and `[CciMount]`
+   lines from the time of the launch.
+
+Status codes are hexadecimal NTSTATUS values, such as `C0000221` (image
+checksum mismatch).

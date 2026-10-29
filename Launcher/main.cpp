@@ -113,7 +113,15 @@ static BOOL FindImage( IMAGE_SET * set )
 {
 	if( FindImageWithExt( "game:\\*.cci", ".cci", set ) ) return TRUE;
 	if( FindImageWithExt( "game:\\*.iso", ".iso", set ) ) return TRUE;
-	Log( "no .cci or .iso file next to default.xex" );
+	Log( "no .cci or .iso file next to default.xex; files in this folder:" );
+	WIN32_FIND_DATA all;
+	HANDLE list = FindFirstFile( "game:\\*", &all );
+	if( list != INVALID_HANDLE_VALUE )
+	{
+		do Log( "  %s%s", all.cFileName, (all.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? "/" : "" );
+		while( FindNextFile( list, &all ) );
+		FindClose( list );
+	}
 	return FALSE;
 }
 
