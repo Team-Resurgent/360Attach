@@ -45,9 +45,18 @@ values.
 ### Running on a devkit
 
 A stock devkit kernel refuses a retail `default.xex` (`C0050002`), so the disc
-does not load as-is. Shadowboot the devkit into a kernel that accepts retail
-signatures (for example Proto or RGLoader), and the mounted disc then loads the
-same way it does on a retail or RGH console.
+does not load as-is. Either shadowboot the devkit into a kernel that accepts
+retail signatures (for example Proto or RGLoader), or convert the image for a
+devkit with [Xbox360Convert](https://github.com/Team-Resurgent/Xbox360Convert):
+
+```
+xbox360convert -i game.cci -o out -m DEVKIT -u
+```
+
+That re-signs every XEX for a devkit, including those inside the disc's STFS
+packages (Arcade titles), and writes each rebuilt package as a CON package with
+a blank signature. When the disc is mounted, those packages are signed with the
+console's own key, so the console accepts them.
 
 ## How it works
 
@@ -63,9 +72,12 @@ same way it does on a retail or RGH console.
   - the DVD/SATA IOCTLs the kernel and XAM send while probing a disc are
     answered from the mounted image (`DvdHook.cpp`);
   - a fake tray open/close is broadcast to SMC listeners so the system drops
-    the previous disc and probes the new one (`VTray.cpp`).
-  The disc is served exactly as it is on the image; the console's kernel
-  handles the signature. With nothing mounted, all requests pass through to the
+    the previous disc and probes the new one (`VTray.cpp`);
+  - CON packages with a blank signature (left by Xbox360Convert) are signed
+    with the console's key at mount, and their signed first sectors are served
+    in place of the blank ones (`ConSign.cpp`).
+  Apart from those signed sectors, the disc is served exactly as it is on the
+  image; the console's kernel handles the signature. With nothing mounted, all requests pass through to the
   real drive driver.
 
 The exports are listed in `common/CciMountApi.h`. `mount.xex` stays loaded

@@ -1933,7 +1933,7 @@ extern "C" {
 	NTAPI
 	XeKeysConsoleSignatureVerification(
 		IN		PBYTE pbHash, // 0x14 byte hash
-		IN		XE_CONSOLE_SIGNATURE sig,
+		IN		const XE_CONSOLE_SIGNATURE * pSig, // by pointer; a by-value struct faults in the kernel
 		IN OUT	PDWORD localCertCompareResult // result of comparing the cert to the console cert
 	);
 

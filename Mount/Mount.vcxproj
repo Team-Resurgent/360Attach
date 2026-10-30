@@ -61,6 +61,7 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="CciIo.cpp" />
+    <ClCompile Include="ConSign.cpp" />
     <ClCompile Include="CciStream.cpp" />
     <ClCompile Include="FileIo.cpp" />
     <ClCompile Include="DvdHook.cpp" />
@@ -73,6 +74,7 @@
     <ClInclude Include="..\common\CciMountApi.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="CciIo.h" />
+    <ClInclude Include="ConSign.h" />
     <ClInclude Include="CciStream.h" />
     <ClInclude Include="FileIo.h" />
     <ClInclude Include="DvdHook.h" />

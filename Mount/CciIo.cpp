@@ -2,6 +2,7 @@
 #include "CciIo.h"
 #include "CciStream.h"
 #include "VTray.h"
+#include "ConSign.h"
 
 #include <cci/cci.h>
 
@@ -111,6 +112,7 @@ static NTSTATUS DoMount( const MOUNT_REQUEST * req )
 	if( NT_SUCCESS(status) ) status = DetectLayout();
 	if( NT_SUCCESS(status) )
 	{
+		ConSignScan( g_BaseSector, g_SectorCount );
 		SetMounted( TRUE );
 		LOG( "mounted: %u sectors from partition sector 0x%X", g_SectorCount, g_BaseSector );
 	}
@@ -128,6 +130,7 @@ static NTSTATUS DoUnmount( VOID )
 {
 	SetMounted( FALSE );
 	memset( &g_MediaInfo, 0, sizeof(g_MediaInfo) );
+	ConSignReset();
 	CciStreamClose();
 	VTrayCycle();
 	return STATUS_SUCCESS;
@@ -157,7 +160,8 @@ static VOID DoRead( PIRP irp )
 				status = CciStreamReadSectors( g_BaseSector + sector + whole, 1, g_Scratch );
 				if( NT_SUCCESS(status) ) memcpy( dest + whole * CCI_SECTOR_SIZE, g_Scratch, tail );
 			}
-			if( !NT_SUCCESS(status) ) status = STATUS_IO_DEVICE_ERROR;
+			if( NT_SUCCESS(status) ) ConSignApply( sector, length, dest );
+			else status = STATUS_IO_DEVICE_ERROR;
 		}
 	}
 
@@ -237,7 +241,7 @@ VOID CciIoStartup( VOID )
 	KeInitializeEvent( &g_Worker.Wake, EventSynchronizationObject, FALSE );
 
 	// System thread on the last hardware thread, which titles rarely saturate.
-	// 32 KB leaves room for the devkit RSA resign, which runs on this thread.
+	// 32 KB leaves room for the console signing at mount, which runs on this thread.
 	DWORD flags = EX_CREATE_FLAG_SYSTEM | EX_CREATE_FLAG_CORE5 | EX_CREATE_FLAG_PRIORITY1;
 	if( NT_SUCCESS(ExCreateThread( &g_Worker.Thread, 0x8000, NULL, NULL, (LPTHREAD_START_ROUTINE)WorkerMain, NULL, flags )) )
 		SetThreadPriority( g_Worker.Thread, THREAD_PRIORITY_TIME_CRITICAL );
