@@ -95,8 +95,14 @@ Output goes to `bin\<Configuration>\`.
 
 ## Status
 
-Builds cleanly; not yet tested on hardware. Xenia cannot run it: its kernel
-does not dispatch I/O to driver objects that the guest replaces.
+Tested on a development kit: it mounts a disc image and launches the game from
+it. A title runs when the console's kernel accepts its executable — a
+devkit-signed build, a retail build converted to debug (XexTool `-m d -r m`),
+or any build on a kernel that takes retail signatures (retail, RGH, or a
+shadowbooted devkit). Single and split `.cci` and `.iso` images all work.
+
+Xenia cannot run it: its kernel does not dispatch I/O to driver objects that
+the guest replaces.
 
 ## Reporting a problem
 
