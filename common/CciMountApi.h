@@ -5,7 +5,7 @@
 #define __CCIMOUNTAPI_H
 
 #define CCIMOUNT_MODULE_NAME		"mount.xex"
-#define CCIMOUNT_VERSION			0x00010200	// 1.2: in-memory devkit resign of default.xex
+#define CCIMOUNT_VERSION			0x00010400	// 1.4: serve the disc unmodified (in-memory devkit resign removed)
 #define CCIMOUNT_MAX_PARTS			8
 
 #define CCIMOUNT_ORD_GETVERSION		1

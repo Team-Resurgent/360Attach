@@ -65,7 +65,6 @@
     <ClCompile Include="FileIo.cpp" />
     <ClCompile Include="DvdHook.cpp" />
     <ClCompile Include="VTray.cpp" />
-    <ClCompile Include="XexDevkit.cpp" />
     <ClCompile Include="..\third_party\libCCI\third_party\lz4\lib\lz4.c">
       <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
@@ -78,7 +77,6 @@
     <ClInclude Include="FileIo.h" />
     <ClInclude Include="DvdHook.h" />
     <ClInclude Include="VTray.h" />
-    <ClInclude Include="XexDevkit.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Exports.def" />

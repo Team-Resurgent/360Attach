@@ -107,11 +107,14 @@ static BOOL FindImageWithExt( const CHAR * pattern, const CHAR * ext, IMAGE_SET 
 	return found;
 }
 
-// A .cci wins over a .iso when both are present.
+// A .cci wins over a .iso when both are present. The search lists the whole
+// folder and filters by extension in code: FATX's FindFirstFile wildcard does
+// not match a split part like name.1.iso with a "*.iso" pattern (the '*' does
+// not span the extra dot), so "game:\*" is used and EndsWithExt does the work.
 static BOOL FindImage( IMAGE_SET * set )
 {
-	if( FindImageWithExt( "game:\\*.cci", ".cci", set ) ) return TRUE;
-	if( FindImageWithExt( "game:\\*.iso", ".iso", set ) ) return TRUE;
+	if( FindImageWithExt( "game:\\*", ".cci", set ) ) return TRUE;
+	if( FindImageWithExt( "game:\\*", ".iso", set ) ) return TRUE;
 	Log( "no .cci or .iso file next to default.xex; files in this folder:" );
 	WIN32_FIND_DATA all;
 	HANDLE list = FindFirstFile( "game:\\*", &all );

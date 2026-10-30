@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "CciIo.h"
 #include "CciStream.h"
-#include "XexDevkit.h"
 #include "VTray.h"
 
 #include <cci/cci.h>
@@ -17,15 +16,6 @@ typedef struct _MOUNT_REQUEST {
 	const CHAR * const * PartPaths;
 	DWORD PartCount;
 } MOUNT_REQUEST;
-
-// XDVDFS volume descriptor fields and directory entry layout.
-#define XDVDFS_ROOT_SECTOR_OFFSET	0x14
-#define XDVDFS_ROOT_SIZE_OFFSET		0x18
-#define XDVDFS_DIRENT_NAME_OFFSET	0x0E
-#define XDVDFS_MAX_ROOT_SIZE		(64 * 1024)
-#define XDVDFS_MAX_TREE_DEPTH		64
-
-#define DISC_XEX_NAME				"default.xex"
 
 // Where the game partition can start inside an image, and where the DMI/SS
 // sector pair sits for the full-disc layouts.
@@ -55,8 +45,6 @@ static volatile BOOL g_Mounted = FALSE;
 static DWORD g_BaseSector = 0;
 static DWORD g_SectorCount = 0;
 static CCI_MEDIA_INFO g_MediaInfo;
-
-static BYTE g_RootDir[XDVDFS_MAX_ROOT_SIZE];
 
 // Worker-only scratch space.
 static BYTE g_Scratch[CCI_SECTOR_SIZE * 2];
@@ -105,80 +93,6 @@ static NTSTATUS DetectLayout( VOID )
 	return STATUS_UNRECOGNIZED_MEDIA;
 }
 
-static DWORD ReadLE32( const BYTE * p )
-{
-	return (DWORD)p[0] | ((DWORD)p[1] << 8) | ((DWORD)p[2] << 16) | ((DWORD)p[3] << 24);
-}
-
-static WORD ReadLE16( const BYTE * p )
-{
-	return (WORD)(p[0] | (p[1] << 8));
-}
-
-// Finds a file in the root directory of the mounted volume. Entries form a
-// binary tree whose links are offsets in 4-byte units; walk all of it rather
-// than rely on the tree's sort order.
-static BOOL FindRootFile( const CHAR * name, DWORD * startSector, DWORD * size )
-{
-	if( !NT_SUCCESS(CciStreamReadSectors( g_BaseSector + XDVDFS_HEADER_OFFSET / CCI_SECTOR_SIZE, 1, g_Scratch )) )
-		return FALSE;
-	DWORD rootSector = ReadLE32( g_Scratch + XDVDFS_ROOT_SECTOR_OFFSET );
-	DWORD rootSize = ReadLE32( g_Scratch + XDVDFS_ROOT_SIZE_OFFSET );
-	DWORD rootSectors = (rootSize + CCI_SECTOR_SIZE - 1) / CCI_SECTOR_SIZE;
-	if( rootSize == 0 || rootSize > sizeof(g_RootDir) || rootSector >= g_SectorCount || rootSectors > g_SectorCount - rootSector )
-	{
-		LOG( "root directory (sector 0x%X, 0x%X bytes) not supported", rootSector, rootSize );
-		return FALSE;
-	}
-	if( !NT_SUCCESS(CciStreamReadSectors( g_BaseSector + rootSector, rootSectors, g_RootDir )) )
-		return FALSE;
-
-	size_t nameLen = strlen( name );
-	DWORD stack[XDVDFS_MAX_TREE_DEPTH];
-	DWORD depth = 0;
-	stack[depth++] = 0;
-	while( depth > 0 )
-	{
-		DWORD offset = stack[--depth];
-		if( offset + XDVDFS_DIRENT_NAME_OFFSET > rootSize ) continue;
-		const BYTE * entry = g_RootDir + offset;
-		BYTE entryNameLen = entry[XDVDFS_DIRENT_NAME_OFFSET - 1];
-		if( offset + XDVDFS_DIRENT_NAME_OFFSET + entryNameLen > rootSize ) continue;
-
-		if( entryNameLen == nameLen && _strnicmp( (const CHAR *)entry + XDVDFS_DIRENT_NAME_OFFSET, name, nameLen ) == 0 )
-		{
-			*startSector = ReadLE32( entry + 4 );
-			*size = ReadLE32( entry + 8 );
-			return TRUE;
-		}
-
-		WORD left = ReadLE16( entry ), right = ReadLE16( entry + 2 );
-		if( left != 0 && left != 0xFFFF && depth < XDVDFS_MAX_TREE_DEPTH ) stack[depth++] = (DWORD)left * 4;
-		if( right != 0 && right != 0xFFFF && depth < XDVDFS_MAX_TREE_DEPTH ) stack[depth++] = (DWORD)right * 4;
-	}
-	return FALSE;
-}
-
-// On a devkit, resign the disc's default.xex into a header-sector buffer.
-// Retail and RGH consoles mount the image unchanged.
-static NTSTATUS PrepareDevkitXex( VOID )
-{
-	if( !XexDevkitIsConsoleDevkit() ) return STATUS_SUCCESS;
-
-	DWORD start, size;
-	if( !FindRootFile( DISC_XEX_NAME, &start, &size ) )
-	{
-		LOG( "devkit: %s not found in the root directory", DISC_XEX_NAME );
-		return STATUS_OBJECT_NAME_NOT_FOUND;
-	}
-	if( start >= g_SectorCount )
-	{
-		LOG( "devkit: %s sector 0x%X is past the end of the partition", DISC_XEX_NAME, start );
-		return STATUS_FILE_CORRUPT_ERROR;
-	}
-	return XexDevkitPatch( g_BaseSector + start, start, size );
-}
-
 static VOID SetMounted( BOOL mounted )
 {
 	g_Mounted = mounted;
@@ -193,11 +107,8 @@ static NTSTATUS DoMount( const MOUNT_REQUEST * req )
 	SetMounted( FALSE );
 	memset( &g_MediaInfo, 0, sizeof(g_MediaInfo) );
 
-	XexDevkitClear();
-
 	NTSTATUS status = CciStreamOpen( req->PartPaths, req->PartCount );
 	if( NT_SUCCESS(status) ) status = DetectLayout();
-	if( NT_SUCCESS(status) ) status = PrepareDevkitXex();
 	if( NT_SUCCESS(status) )
 	{
 		SetMounted( TRUE );
@@ -206,7 +117,6 @@ static NTSTATUS DoMount( const MOUNT_REQUEST * req )
 	else
 	{
 		LOG( "mount failed 0x%08X (check the lines above for the step that failed)", status );
-		XexDevkitClear();
 		CciStreamClose();
 	}
 
@@ -218,7 +128,6 @@ static NTSTATUS DoUnmount( VOID )
 {
 	SetMounted( FALSE );
 	memset( &g_MediaInfo, 0, sizeof(g_MediaInfo) );
-	XexDevkitClear();
 	CciStreamClose();
 	VTrayCycle();
 	return STATUS_SUCCESS;
@@ -248,7 +157,6 @@ static VOID DoRead( PIRP irp )
 				status = CciStreamReadSectors( g_BaseSector + sector + whole, 1, g_Scratch );
 				if( NT_SUCCESS(status) ) memcpy( dest + whole * CCI_SECTOR_SIZE, g_Scratch, tail );
 			}
-			if( NT_SUCCESS(status) ) XexDevkitSplice( sector, length, dest );
 			if( !NT_SUCCESS(status) ) status = STATUS_IO_DEVICE_ERROR;
 		}
 	}

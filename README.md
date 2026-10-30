@@ -1,9 +1,26 @@
 # 360Attach
 
+<p align="center"><b>Mount a CCI or ISO disc image (single or split) as the Xbox 360's DVD drive and launch it — on retail, RGH, or a shadowbooted devkit</b></p>
+
+<p align="center">
+  <a href="https://github.com/Team-Resurgent/360Attach/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3"></a>
+  <a href="https://discord.gg/VcdSfajQGK"><img src="https://img.shields.io/badge/chat-on%20discord-7289da.svg?logo=discord" alt="Discord"></a>
+</p>
+
+<p align="center">
+  <a href="https://ko-fi.com/J3J7L5UMN"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="ko-fi"></a>
+  <a href="https://www.patreon.com/teamresurgent"><img src="https://img.shields.io/badge/Patreon-F96854?style=for-the-badge&logo=patreon&logoColor=white" alt="Patreon"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Team-Resurgent/360Attach/releases/latest"><img src="https://img.shields.io/badge/download-latest-brightgreen.svg?style=for-the-badge&logo=github" alt="Download"></a>
+</p>
+
 Mounts a CCI disc image as the Xbox 360's DVD drive and launches the game on it.
-Built with Visual Studio 2010 and the Xbox 360 XDK (21256). Retail and RGH
-consoles load the disc as it is. On a devkit, the disc's `default.xex` is
-resigned in memory so the kit accepts it.
+Built with Visual Studio 2010 and the Xbox 360 XDK (21256). The disc is served
+unmodified, so it runs on a console whose kernel accepts the disc's own
+signature: a retail or RGH console, or a devkit shadowbooted into a kernel that
+does (see *Running on a devkit* below).
 
 ## Using it
 
@@ -25,6 +42,13 @@ Both trimmed images (game partition only) and full XGD2/XGD3 dumps work; for a
 full dump the security sectors are read so XGD2 drive-info queries get real
 values.
 
+### Running on a devkit
+
+A stock devkit kernel refuses a retail `default.xex` (`C0050002`), so the disc
+does not load as-is. Shadowboot the devkit into a kernel that accepts retail
+signatures (for example Proto or RGLoader), and the mounted disc then loads the
+same way it does on a retail or RGH console.
+
 ## How it works
 
 - **Launcher** (`default.xex`, a title) finds the image, checks it with libCCI
@@ -39,16 +63,10 @@ values.
   - the DVD/SATA IOCTLs the kernel and XAM send while probing a disc are
     answered from the mounted image (`DvdHook.cpp`);
   - a fake tray open/close is broadcast to SMC listeners so the system drops
-    the previous disc and probes the new one (`VTray.cpp`);
-  - on a devkit (`XeKeysGetConsoleType`), the root `default.xex` is resigned
-    in memory before the game launches (`XexDevkit.cpp`). The image key is
-    rewrapped and the header is signed with the debug key, the same transform
-    as XexTool `-m d`. Only those header sectors are substituted when the
-    loader reads the file; the executable stays the same size, and the rest of
-    it is still read from the image. A manufacturing executable, or one that
-    is already debug-signed, is left unchanged. If the resign fails, the mount
-    fails instead of launching a retail-signed executable.
-  With nothing mounted, all requests pass through to the real drive driver.
+    the previous disc and probes the new one (`VTray.cpp`).
+  The disc is served exactly as it is on the image; the console's kernel
+  handles the signature. With nothing mounted, all requests pass through to the
+  real drive driver.
 
 The exports are listed in `common/CciMountApi.h`. `mount.xex` stays loaded
 until reboot; if you replace it with a newer build, reboot before launching
