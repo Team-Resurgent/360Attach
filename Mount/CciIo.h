@@ -5,7 +5,8 @@
 
 // Security-sector details of a full (non-trimmed) disc image.
 typedef struct _CCI_MEDIA_INFO {
-	BOOL Valid;
+	BOOL Valid;					// full-dump security sectors parsed (layer info and hash are real)
+	BOOL HasMediaId;			// MediaId is known, from the security sectors or the disc's default.xex header
 	BYTE MediaId[0x10];
 	DWORD LayerInfo[3];			// start, end, layer 0 end PSNs
 	DWORD HashTableLba;

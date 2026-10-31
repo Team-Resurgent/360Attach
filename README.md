@@ -76,6 +76,12 @@ console's own key, so the console accepts them.
   - CON packages with a blank signature (left by Xbox360Convert) are signed
     with the console's key at mount, and their signed first sectors are served
     in place of the blank ones (`ConSign.cpp`).
+  - while a full (untrimmed) image is mounted, the kernel's `XeKeysGetMediaID`
+    export is pointed at a hook that returns the image's own media ID, so the
+    content, update and licence checks a signed-in profile makes when a disc
+    title starts match the disc instead of reading the empty drive
+    (`MediaIdHook.cpp`, `KernelHook.cpp`). The image is served unchanged, so a
+    title update still matches.
   Apart from those signed sectors, the disc is served exactly as it is on the
   image; the console's kernel handles the signature. With nothing mounted, all requests pass through to the
   real drive driver.

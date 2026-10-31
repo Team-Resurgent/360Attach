@@ -3,6 +3,7 @@
 #include "CciStream.h"
 #include "VTray.h"
 #include "ConSign.h"
+#include "MediaIdHook.h"
 
 #include <cci/cci.h>
 
@@ -66,6 +67,99 @@ static VOID ParseSecuritySectors( const BYTE * dmi, const BYTE * ss )
 	memcpy( &g_MediaInfo.HashTableLba, ss + 0x100, sizeof(g_MediaInfo.HashTableLba) );
 	memcpy( g_MediaInfo.HashTableHash, ss + 0x108, sizeof(g_MediaInfo.HashTableHash) );
 	g_MediaInfo.Valid = TRUE;
+	g_MediaInfo.HasMediaId = TRUE;
+}
+
+static BYTE ToLowerAscii( BYTE c ) { return ( c >= 'A' && c <= 'Z' ) ? (BYTE)(c + 0x20) : c; }
+
+static BOOL NameEquals( const BYTE * a, const char * b, DWORD len )
+{
+	for( DWORD i = 0; i < len; i++ )
+		if( ToLowerAscii( a[i] ) != ToLowerAscii( (BYTE)b[i] ) ) return FALSE;
+	return TRUE;
+}
+
+// Finds a file in the XDVDFS root directory by name (the entries form a binary
+// tree of 4-byte-unit links, walked with a bounded stack). Returns its start
+// sector, relative to the game partition, and size.
+static BOOL FindRootFile( const char * name, DWORD nameLen, DWORD * outSector, DWORD * outSize )
+{
+	if( !NT_SUCCESS(CciStreamReadSectors( g_BaseSector + XDVDFS_HEADER_OFFSET / CCI_SECTOR_SIZE, 1, g_Scratch )) ) return FALSE;
+	// XDVDFS fields are little-endian; this runs big-endian, so assemble by byte.
+	const BYTE * h = g_Scratch;
+	DWORD rootSector = h[0x14] | (h[0x15] << 8) | (h[0x16] << 16) | ((DWORD)h[0x17] << 24);
+	DWORD rootSize = h[0x18] | (h[0x19] << 8) | (h[0x1A] << 16) | ((DWORD)h[0x1B] << 24);
+	if( rootSize == 0 || rootSize > 0x100000 || rootSector >= g_SectorCount ) return FALSE;
+
+	DWORD sectors = (rootSize + CCI_SECTOR_SIZE - 1) / CCI_SECTOR_SIZE;
+	BYTE * dir = (BYTE *)ExAllocatePool( sectors * CCI_SECTOR_SIZE );
+	WORD * stack = (WORD *)ExAllocatePool( (rootSize / 4 + 1) * sizeof(WORD) );
+	BOOL found = FALSE;
+	if( dir != NULL && stack != NULL && NT_SUCCESS(CciStreamReadSectors( g_BaseSector + rootSector, sectors, dir )) )
+	{
+		DWORD maxEntries = rootSize / 4, depth = 0, visited = 0;
+		stack[depth++] = 0;
+		while( depth > 0 && visited++ < maxEntries )
+		{
+			DWORD offset = (DWORD)stack[--depth] * 4;
+			if( offset + 14 > rootSize ) continue;
+			const BYTE * e = dir + offset;
+			WORD left = (WORD)( e[0] | (e[1] << 8) );
+			WORD right = (WORD)( e[2] | (e[3] << 8) );
+			BYTE nlen = e[13];
+			if( left == 0xFFFF || nlen == 0 ) continue;
+			if( left != 0 && depth < maxEntries ) stack[depth++] = left;
+			if( right != 0 && right != 0xFFFF && depth < maxEntries ) stack[depth++] = right;
+			if( offset + 14 + nlen <= rootSize && nlen == nameLen && NameEquals( e + 14, name, nameLen ) )
+			{
+				*outSector = e[4] | (e[5] << 8) | (e[6] << 16) | ((DWORD)e[7] << 24);
+				*outSize = e[8] | (e[9] << 8) | (e[10] << 16) | ((DWORD)e[11] << 24);
+				found = TRUE;
+				break;
+			}
+		}
+	}
+	if( stack != NULL ) ExFreePool( stack );
+	if( dir != NULL ) ExFreePool( dir );
+	return found;
+}
+
+// A trimmed image carries no security sectors, so when the full-disc parse did
+// not find a media ID, take it from the disc's default.xex header instead (the
+// XEX's own media ID, which a converted disc preserves). It is what a signed-in
+// profile's content, update and licence checks compare against.
+static VOID ReadDiscXexMediaId( VOID )
+{
+	if( g_MediaInfo.HasMediaId ) return;
+
+	DWORD xexSector = 0, xexSize = 0;
+	if( !FindRootFile( "default.xex", 11, &xexSector, &xexSize ) || xexSector >= g_SectorCount )
+	{
+		LOG( "no media ID: default.xex not found on disc" );
+		return;
+	}
+
+	if( !NT_SUCCESS(CciStreamReadSectors( g_BaseSector + xexSector, 1, g_Scratch )) ) return;
+	if( memcmp( g_Scratch, "XEX2", 4 ) != 0 ) { LOG( "no media ID: disc default.xex is not XEX2" ); return; }
+
+	// Security info offset is big-endian; the media ID sits in its image header
+	// (XEX_SECURITY_INFO + 8 for HV_IMAGE_INFO, + 0x138 for MediaID).
+	const BYTE * h = g_Scratch;
+	DWORD secInfo = ((DWORD)h[0x10] << 24) | (h[0x11] << 16) | (h[0x12] << 8) | h[0x13];
+	DWORD mediaOff = secInfo + 0x8 + 0x138;
+	DWORD need = mediaOff + sizeof(g_MediaInfo.MediaId);
+	DWORD sectors = (need + CCI_SECTOR_SIZE - 1) / CCI_SECTOR_SIZE;
+	if( sectors == 0 || sectors > 0x20 || xexSector + sectors > g_SectorCount ) return;
+
+	BYTE * buf = (BYTE *)ExAllocatePool( sectors * CCI_SECTOR_SIZE );
+	if( buf == NULL ) return;
+	if( NT_SUCCESS(CciStreamReadSectors( g_BaseSector + xexSector, sectors, buf )) )
+	{
+		memcpy( g_MediaInfo.MediaId, buf + mediaOff, sizeof(g_MediaInfo.MediaId) );
+		g_MediaInfo.HasMediaId = TRUE;
+		LOG( "disc media ID from default.xex: %02X%02X%02X%02X...", buf[mediaOff], buf[mediaOff+1], buf[mediaOff+2], buf[mediaOff+3] );
+	}
+	ExFreePool( buf );
 }
 
 // Finds the XDVDFS header and records where the game partition begins.
@@ -113,6 +207,8 @@ static NTSTATUS DoMount( const MOUNT_REQUEST * req )
 	if( NT_SUCCESS(status) )
 	{
 		ConSignScan( g_BaseSector, g_SectorCount );
+		ReadDiscXexMediaId();
+		MediaIdHookInstall();
 		SetMounted( TRUE );
 		LOG( "mounted: %u sectors from partition sector 0x%X", g_SectorCount, g_BaseSector );
 	}
@@ -129,6 +225,7 @@ static NTSTATUS DoMount( const MOUNT_REQUEST * req )
 static NTSTATUS DoUnmount( VOID )
 {
 	SetMounted( FALSE );
+	MediaIdHookRemove();
 	memset( &g_MediaInfo, 0, sizeof(g_MediaInfo) );
 	ConSignReset();
 	CciStreamClose();

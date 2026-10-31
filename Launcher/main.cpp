@@ -487,6 +487,22 @@ static BOOL MountAndLaunch( VOID )
 		return FALSE;
 	}
 
+	// Record the media ID the mount serves (through the hooked kernel export), so
+	// Launcher.log shows what identity a disc title will see.
+	{
+		HANDLE kernel = NULL;
+		PVOID fn = NULL;
+		if( XexGetModuleHandle( MODULE_KERNEL, &kernel ) == 0 && kernel != NULL &&
+			XexGetProcedureAddress( kernel, 690, &fn ) == 0 && fn != NULL )
+		{
+			BYTE id[0x10];
+			memset( id, 0, sizeof(id) );
+			((NTSTATUS (NTAPI *)(PBYTE, BOOL))fn)( id, FALSE );
+			Log( "disc media ID: %02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+				id[0],id[1],id[2],id[3],id[4],id[5],id[6],id[7],id[8],id[9],id[10],id[11],id[12],id[13],id[14],id[15] );
+		}
+	}
+
 	Log( "mounted, launching %s", DISC_EXEC );
 	if( g_Log != NULL ) { fclose( g_Log ); g_Log = NULL; }
 

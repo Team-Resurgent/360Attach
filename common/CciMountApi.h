@@ -5,7 +5,7 @@
 #define __CCIMOUNTAPI_H
 
 #define CCIMOUNT_MODULE_NAME		"mount.xex"
-#define CCIMOUNT_VERSION			0x00010500	// 1.5: console-sign blank CON packages from converted discs
+#define CCIMOUNT_VERSION			0x00010600	// 1.6: serve the mounted image's media ID via a kernel XeKeysGetMediaID hook
 #define CCIMOUNT_MAX_PARTS			8
 
 #define CCIMOUNT_ORD_GETVERSION		1
