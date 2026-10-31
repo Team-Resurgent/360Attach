@@ -5,7 +5,7 @@
 #define __CCIMOUNTAPI_H
 
 #define CCIMOUNT_MODULE_NAME		"mount.xex"
-#define CCIMOUNT_VERSION			0x00010600	// 1.6: serve the mounted image's media ID via a kernel XeKeysGetMediaID hook
+#define CCIMOUNT_VERSION			0x00010700	// 1.7: bypass AP25 media authentication (XexCheckExecutablePrivilege) so disc titles run with a profile signed in
 #define CCIMOUNT_MAX_PARTS			8
 
 #define CCIMOUNT_ORD_GETVERSION		1

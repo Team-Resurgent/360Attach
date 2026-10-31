@@ -12,4 +12,10 @@ DWORD KernelHookExport( DWORD ordinal, PVOID replacement );
 // Restores an entry patched by KernelHookExport.
 VOID KernelUnhookExport( DWORD ordinal, DWORD original );
 
+// Writes one 32-bit word into a (possibly write-protected) image page: through
+// the debug monitor on a devkit, else a direct store. isCode adds the
+// instruction-cache maintenance a rewritten code word needs, so hooks that
+// patch a call thunk (ImportHook) can share this writer.
+VOID HookWrite32( volatile DWORD * dest, DWORD value, BOOL isCode );
+
 #endif // __KERNELHOOK_H

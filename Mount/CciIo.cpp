@@ -4,6 +4,7 @@
 #include "VTray.h"
 #include "ConSign.h"
 #include "MediaIdHook.h"
+#include "AuthHook.h"
 
 #include <cci/cci.h>
 
@@ -209,6 +210,7 @@ static NTSTATUS DoMount( const MOUNT_REQUEST * req )
 		ConSignScan( g_BaseSector, g_SectorCount );
 		ReadDiscXexMediaId();
 		MediaIdHookInstall();
+		AuthHookInstall();
 		SetMounted( TRUE );
 		LOG( "mounted: %u sectors from partition sector 0x%X", g_SectorCount, g_BaseSector );
 	}
@@ -225,6 +227,7 @@ static NTSTATUS DoMount( const MOUNT_REQUEST * req )
 static NTSTATUS DoUnmount( VOID )
 {
 	SetMounted( FALSE );
+	AuthHookRemove();
 	MediaIdHookRemove();
 	memset( &g_MediaInfo, 0, sizeof(g_MediaInfo) );
 	ConSignReset();

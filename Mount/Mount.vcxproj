@@ -64,6 +64,8 @@
     <ClCompile Include="ConSign.cpp" />
     <ClCompile Include="KernelHook.cpp" />
     <ClCompile Include="MediaIdHook.cpp" />
+    <ClCompile Include="ImportHook.cpp" />
+    <ClCompile Include="AuthHook.cpp" />
     <ClCompile Include="CciStream.cpp" />
     <ClCompile Include="FileIo.cpp" />
     <ClCompile Include="DvdHook.cpp" />
@@ -79,6 +81,8 @@
     <ClInclude Include="ConSign.h" />
     <ClInclude Include="KernelHook.h" />
     <ClInclude Include="MediaIdHook.h" />
+    <ClInclude Include="ImportHook.h" />
+    <ClInclude Include="AuthHook.h" />
     <ClInclude Include="CciStream.h" />
     <ClInclude Include="FileIo.h" />
     <ClInclude Include="DvdHook.h" />

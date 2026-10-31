@@ -26,20 +26,27 @@ static DM_SET_MEMORY DebugSetMemory( VOID )
 	return g_DmSetMemory;
 }
 
-static VOID WriteExportEntry( volatile DWORD * dest, DWORD value )
+VOID HookWrite32( volatile DWORD * dest, DWORD value, BOOL isCode )
 {
+	UNREFERENCED_PARAMETER( isCode );		// a patched thunk and the dcache store share one cache line
+
 	DM_SET_MEMORY dm = DebugSetMemory();
 	if( dm != NULL )
 	{
 		DWORD written = 0;
-		dm( (LPVOID)dest, sizeof(DWORD), &value, &written );
+		dm( (LPVOID)dest, sizeof(DWORD), &value, &written );	// the debug monitor writes the protected page and sweeps the caches
+		return;
 	}
-	else
-	{
-		*dest = value;
-		__dcbst( 0, (void *)dest );
-		__sync();
-	}
+
+	// Retail or RGH: the page is writable, so store and push the line to memory.
+	*dest = value;
+	__dcbst( 0, (void *)dest );
+	__sync();
+}
+
+static VOID WriteExportEntry( volatile DWORD * dest, DWORD value )
+{
+	HookWrite32( dest, value, FALSE );		// an export-table entry is data, not code
 }
 
 // The kernel carries no PE-exports header field, so its export table is the one
